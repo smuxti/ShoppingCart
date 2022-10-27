@@ -1,0 +1,267 @@
+﻿@page "/"
+@using Shop.DataModels.CustomModels;
+@inject NavigationManager Navmanager;
+@using Shop.Web.Services;
+@inject ProtectedSessionStorage sessionstorage;
+@inject IUserPanelService userpanelservice;
+
+<style>
+    .column {
+        float: left;
+        padding: 15px;
+    }
+
+    .clearfix::after {
+        content: "";
+        clear: both;
+        display: table;
+    }
+
+    .menu {
+        width: 25%;
+        margin-top: 10px;
+        border: 1px outset #808080;
+        border-radius: 7px;
+        background: linear-gradient(-45deg,#ffd800,#808080,#23a6d5,#ff00d3);
+        color: black;
+    }
+
+    .content {
+        width: 75%;
+    }
+
+    .menu ul {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .menu li {
+        padding: 8px;
+        margin-bottom: 8px;
+        color: black;
+        background-color: white;
+    }
+
+        .menu li:hover {
+            background-color: #e7e4e4;
+            color: #808080;
+        }
+
+    .stuff {
+        padding: 8px;
+        margin: 1px;
+        background-color: white;
+        border: 1px outset black;
+    }
+
+    .add-to-cart {
+        border: 1px outset black;
+        width: 100%;
+        background-color: #b6ff00;
+    }
+</style>
+
+
+<div style="min-height:500px;">
+    <div class="column menu">
+        @if (categories == null)
+        {
+            <span> Loading.... </span>
+        }
+            else
+            {
+                <div style="text-align:center;">
+                    <h5>Shopping List</h5>
+                </div>
+                <ul>
+                    @foreach (var category in categories)
+                    {
+                        <li style="cursor:pointer" @onclick="(()=>LoadProductByCategory(category))">@category.Name</li>
+                    }
+                </ul>
+            }
+    </div>
+    <div class="column content">
+        @if (products==null)
+        {
+            <span> loading... </span>
+        }
+        else
+            {
+                <div class="container">
+                    <div style="padding: 5px 0px 0px 0px;border-bottom:1px ridge black;margin-bottom:5px;">
+                        <h5><i><u>@CategoryName</u></i></h5>
+                    </div>
+
+                    <div class="row">
+                        @foreach (var prod in products)
+                        {
+                            <div class="col-md-4">
+                                <div class="col-md-12 stuff">
+                                    <div style="width:100%;border-radius:2px;background-color:white;">
+                                        <button type="button" class="btn" style="border:2px #cff7f9 inset;width:100%;">
+                                            @prod.Name
+                                        </button>
+
+                                        <img src="http://localhost:30898//@prod.ImageURL" style="width:100%;height:150px;border-radius:1px" />
+                                        <div>
+                                            Price:&nbsp;Rs @prod.Price &nbsp;&nbsp;<span style="color:red">Stock&nbsp;@prod.Stock</span>
+                                        </div>
+                                        @if (prod.CartFlag)
+                                        {
+                                            <button type="button" class="btn add-to-cart" style="background:#ffd800;" @onclick="(()=>AddToCart_click(prod))">Remove from cart</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn add-to-cart" @onclick="(()=>AddToCart_click(prod))">Add to cart</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                    </div>
+                </div>
+            }
+
+    </div>
+</div>
+
+
+
+@code{
+    public List<CategoryModel> categories { get; set; }
+    public List<ProductModel> products { get; set; }
+    public string CategoryName = string.Empty;
+    public bool cartFlag = false;
+    public List<CartModel> myCart { get; set; }
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCategories();
+    }
+
+    private async Task GetCategories()
+    {
+        categories = await userpanelservice.GetCategories();
+        if (categories != null && categories.Count > 0)
+        {
+            await LoadProductByCategory(categories.FirstOrDefault());
+        }
+    }
+
+    private async Task LoadProductByCategory(CategoryModel category)
+    {
+        CategoryName = category.Name;
+        products = await userpanelservice.GetProductByCategoryId(category.Id);
+        if (products !=null && products.Count>0)
+        {
+            await updateCartText();
+
+        }
+    }
+
+
+    private async Task AddToCart_click(ProductModel productClicked)
+    {
+
+        cartFlag = true;
+        var result = await sessionstorage.GetAsync<List<CartModel>>("myCart");
+
+        if (!result.Success)
+        {
+            myCart = new List<CartModel>();
+            if (productClicked.CartFlag)
+            {
+                var existprod = myCart.Where(x => x.PrductId== productClicked.Id).FirstOrDefault();
+                if (existprod !=null)
+                {
+                    myCart.Remove(existprod);
+                    await sessionstorage.SetAsync("myCart", myCart);
+                }
+
+            }
+            else
+            {
+                CartModel cm = new CartModel();
+                cm.PrductId = productClicked.Id;
+                cm.Quntity = 1;
+                cm.AvailableStock = Convert.ToInt32(productClicked.Stock);
+                cm.ProductName = productClicked.Name;
+                cm.ProductImage = productClicked.ImageURL;
+                cm.Price = Convert.ToInt32(productClicked.Price);
+                myCart.Add(cm);
+                await sessionstorage.SetAsync("myCart", myCart);
+            }
+        }
+        else
+        {
+            myCart = result.Value;
+            if (productClicked.CartFlag)
+            {
+                var existprod = myCart.Where(x => x.PrductId == productClicked.Id).FirstOrDefault();
+                if (existprod != null)
+                {
+                    myCart.Remove(existprod);
+                    await sessionstorage.SetAsync("myCart", myCart);
+                }
+
+            }
+            else
+            {
+                CartModel cm = new CartModel();
+                cm.PrductId = productClicked.Id;
+                cm.Quntity = 1;
+                cm.AvailableStock = Convert.ToInt32(productClicked.Stock);
+                cm.ProductName = productClicked.Name;
+                cm.ProductImage = productClicked.ImageURL;
+                cm.Price = Convert.ToInt32(productClicked.Price);
+                myCart.Add(cm);
+                await sessionstorage.SetAsync("myCart", myCart);
+            }
+        }
+        await updateCartText();
+        await notify.InvokeAsync();
+    }
+
+
+    private async Task updateCartText()
+    {
+        if (cartFlag)
+        {
+            var result = await sessionstorage.GetAsync<List<CartModel>>("myCart");
+            if (result.Success)
+            {
+                foreach (var p in products)
+                {
+                    p.CartFlag = false;
+                }
+                myCart = result.Value;
+                foreach (var c in myCart)
+                {
+                    var cartprod = products.Where(x => x.Id == c.PrductId).FirstOrDefault();
+                    if (cartprod != null)
+                    {
+                        cartprod.CartFlag = true;
+                    }
+                }
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(firstRender)
+        {
+            var result = await sessionstorage.GetAsync<List<CartModel>>("myCart");
+            if (result.Success)
+            {
+                cartFlag = true;
+            }
+        }
+    }
+}

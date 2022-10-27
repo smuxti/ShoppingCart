@@ -1,0 +1,279 @@
+﻿@page "/mycart"
+@using Shop.DataModels.CustomModels;
+@inject NavigationManager Navmanager;
+@using Shop.Web.Services;
+@inject ProtectedSessionStorage sessionstorage;
+@inject IUserPanelService userpanelservice;
+
+<style>
+    .small-container{
+        max-width:1080px;
+        margin:auto;
+        padding-left:10px;
+        padding-right:10px;
+    }
+    .cart-page{
+        margin:20px;
+    }
+    table{
+        width:100%;
+        border-collapse:collapse;
+    }
+    .cart-info{
+        display:flex;
+        flex-wrap:wrap;
+    }
+    th{
+        text-align:left;
+        padding:5px;
+        color:#ffffff;
+        background:#808080;
+        font-weight:normal;
+    }
+    td{
+        padding:10px 5px;
+    }
+    td input{
+        width:40px;
+        height:30px;
+        padding:5px;
+    }
+    td a{
+        color:#ff523b;
+        font-size:12px;
+    }
+    td img{
+        width:80px;
+        height:80px;
+        margin-right:10px;
+    }
+    .total-price{
+        display:flex;
+        justify-content:flex-end;
+    }
+    .total-price table{
+        border-top:3px solid #ff523b;
+        width:100%;
+        max-width:400px;
+    }
+    td:last-child{
+        text-align:right;
+    }
+    th:last-child{
+        text-align:right;
+    }
+</style>
+
+
+<div style="padding:10px 0px 0px 10px; text-align:right;">
+    @if(@userName != null && @userEmail !=null)
+            {
+                <span>
+                    <span style="border:1px ridge #ff523b;background-color:#ff6a00;border-radius:10px;color:#ffffff;padding:3px;">My Cart</span>
+                        &nbsp;&nbsp;
+                        <b>
+                            Name : @userName
+                            &nbsp;&nbsp;
+                            Email : @userEmail
+                        </b>
+                    
+                </span>
+            }
+    @if (@myCart != null && @myCart.Count>0)
+    {
+        <button type="button" value="Clear" class="btn btn-primary" @onclick="@Clear_Click">Clear</button>
+    }
+</div>
+
+<div class="small-container cart-page" >
+    @if (@myCart != null && @myCart.Count>0)
+    {
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Remove</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Subtotal</th>
+            </tr>
+            @foreach (var cart in myCart)
+            {
+        <tr>
+            <td>
+                <div class="cart-info">
+                    <img src="http://localhost:30898//@cart.ProductImage" alt="Product Photo" />
+                    <div>
+                        <p>@cart.ProductName</p>
+                    </div>
+                </div>
+            </td>
+            <td><a @onclick="(()=>RemoveFormCart_Click(cart))" style="cursor:pointer;" class="btn btn-danger">Remove</a></td>
+            <td>Rs @cart.Price</td>
+            <td><input type="number" @bind="cart.Quntity" min="=1" max="@cart.AvailableStock" @onclick="@onQuantityChange" style="width:60px;" /></td>
+            <td>Rs @(cart.Price*cart.Quntity).00</td>
+        </tr>
+            }
+        </table>
+        <div class="total-price">
+           <table>
+               <tr>
+                   <td>Subtotal</td>
+                   <td>Rs @subTotal</td>
+               </tr>
+               <tr>
+                   <td>Shipping Charges</td>
+                   <td>Rs @shippingCharges</td>
+               </tr>
+               <tr>
+                   <td>Total</td>
+                   <td>Rs @finalTotal.00</td>
+               </tr>
+               <tr>
+                   <td>Shipping Address</td>
+                   <td><textarea rows="3" cols="30" name="shippingaddress" placeholder="Shipping Address" @bind="shippingAddress"></textarea></td>
+               </tr>
+               <tr>
+                   <td>Payment Mode</td>
+                   <td>@paymentMode</td>
+               </tr>
+               <tr>
+                   <td></td>
+                   <td>
+                       <button type="button" value="Checkout" class="btn btn-primary" @onclick="@Checkout_Click">Checkout</button>
+                   </td>
+               </tr>
+           </table>
+        </div>
+    }
+    else
+            {
+        <hr/>
+        <div style="text-align:center;">
+            <h4>Ooooppsssss... Your cart is empty</h4>
+        </div>
+            }
+
+</div>
+
+
+
+
+<h3>MyCart</h3>
+
+@code {
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+    public List<CartModel> myCart { get; set; }
+    public string shippingAddress { get; set; }
+    public string paymentMode { get; set; }
+    public string userName { get; set; }
+    public string userEmail { get; set; }
+    public int subTotal { get; set; }
+    public int shippingCharges { get; set; }
+    public int finalTotal { get; set; }
+    public bool IsUserLoggedIn = false;
+
+
+    private async Task RemoveFormCart_Click(CartModel cartItem)
+    {
+        myCart.Remove(cartItem);
+        await sessionstorage.SetAsync("myCart", myCart);
+        onQuantityChange();
+        await notify.InvokeAsync();
+    }
+
+    private void onQuantityChange()
+    {
+        finalTotal = 0;
+        subTotal = 0;
+        foreach (var item in myCart)
+        {
+            subTotal = subTotal + (item.Price * item.Quntity);
+        }
+        finalTotal = subTotal + shippingCharges;
+    }
+
+    protected override Task OnInitializedAsync()
+    {
+        shippingCharges = 100;
+        subTotal = 0;
+        paymentMode = "Cash on delivery";
+        return base.OnInitializedAsync();
+    }
+
+    private async Task Checkout_Click()
+    {
+        if (myCart != null && myCart.Count>0)
+        {
+            myCart.FirstOrDefault().ShippingAddress = shippingAddress;
+            myCart.FirstOrDefault().ShippingCharges = shippingCharges;
+            myCart.FirstOrDefault().SubTotal = subTotal;
+            myCart.FirstOrDefault().PaymentMod = paymentMode;
+        }
+        var sessionuser = await sessionstorage.GetAsync<string>("userKey");
+        if (sessionuser.Success)
+        {
+            myCart.FirstOrDefault().UserId = Convert.ToInt32(sessionuser.Value);
+        }
+
+        await sessionstorage.SetAsync("myCart", myCart);
+        IsUserLoggedIn = await userpanelservice.IsUserLoggedIn();
+        if (IsUserLoggedIn)
+        {
+            var response = await userpanelservice.CheckOut(myCart);
+            if (response != null)
+            {
+                myCart.Clear();
+                await sessionstorage.SetAsync("myCart", myCart);
+                await sessionstorage.SetAsync("latestOrder", response.Message);
+                await notify.InvokeAsync();
+                Navmanager.NavigateTo("myaccount");
+            }
+        }
+        else
+        {
+            await sessionstorage.SetAsync("checkoutAlert", "Register or Login to place your order");
+            Navmanager.NavigateTo("login");
+        }
+    }
+
+    private async Task Clear_Click()
+    {
+        myCart = new List<CartModel>();
+        await sessionstorage.DeleteAsync("myCart");
+        await notify.InvokeAsync();
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var result = await sessionstorage.GetAsync<List<CartModel>>("myCart");
+            if (result.Success)
+            {
+                myCart = result.Value;
+                foreach (var item in myCart)
+                {
+                    subTotal = subTotal + (item.Price * item.Quntity);
+                }
+                if (myCart != null && myCart.Count>0)
+                {
+                    shippingAddress = myCart.FirstOrDefault().ShippingAddress;
+                }
+
+            }
+        }
+        finalTotal = subTotal + shippingCharges;
+
+        var sessionusername = await sessionstorage.GetAsync<string>("userName");
+        var sessionemail = await sessionstorage.GetAsync<string>("userEmail");
+        if (sessionusername.Success && sessionemail.Success)
+        {
+            userName = sessionusername.Value;
+            userEmail = sessionemail.Value;
+        }
+
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,199 @@
+﻿@page "/orders"
+@using Shop.Admin.Services;
+@inject IAdminPanelService adminpanelservice
+@using Shop.DataModels.Models;
+
+<h3>Orders</h3>
+<div class="row">
+    <div class=" col-3">
+        <label for="startdate">Search Order By Date : </label>
+        <input type="search" id="startdate" @bind-value="startDate" class="form-control" />
+    </div>
+    <div class="col-3">
+        <label>&nbsp;</label>
+        <br />
+        <button type="button" class="btn btn-primary" @onclick="LoadOrderByDay">Search</button>
+    </div>
+</div>
+
+
+<style>
+    .modal {
+        position: fixed;
+        z-index: 1;
+        padding-top: 100px;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: rgb(0,0,0);
+        background-color: rgba(0,0,0,0.4);
+        display: block;
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 50%;
+        overflow: hidden;
+    }
+
+    .close {
+        color: #aaaaaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+</style>
+
+
+@if (orderlist == null)
+{
+    <h4>oops there are no orders.......</h4>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Customer Id</th>
+                <th>Order Number</th>
+                <th>Order Date</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var order in orderlist)
+            {
+                <tr>
+                    <td>@order.CustomerId.Value</td>
+                    <td>@order.OrderId</td>
+                    <td>@order.CreatedOn</td>
+                    <td>
+                        <button type="button" class="btn btn-primary" @onclick="(()=>DetailClick(order.OrderId))">Detail</button>
+                    </td>
+                </tr>
+
+            }
+
+        </tbody>
+    </table>
+}
+
+
+@if (DetailPopup == true)
+{
+    if (details == null)
+    {
+        <h3>sorry but no details available</h3>
+    }
+    else
+    {
+        <div class="modal">
+            <div class=" modal-content">
+                <div class="modal-header">
+                    <h5>Details</h5>
+                    <span class="close" @onclick="ToggleDetailPopup">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Payment Mode</th>
+                                <th>Shipping Address</th>
+                                <th>Shipping Charges</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var det in details)
+                            {
+                                <tr>
+                                    <td>@det.PaymentMode</td>
+                                    <td>@det.ShippingAddress</td>
+                                    <td>@det.ShippingCharges</td>
+                                    <td>@det.Total</td>
+                                </tr>
+                            }
+
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                </div>
+            </div>
+
+        </div>
+    }
+}
+
+@code {
+    public List<CustomerOrder> orderlist { get; set; }
+    public List<CustomerOrder> details { get; set; }
+    public string Message = string.Empty;
+    public bool DetailPopup = false;
+    private string startDate;
+    private string endDate;
+
+
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+
+
+    private async Task<List<CustomerOrder>> GetOrders()
+    {
+        orderlist = await adminpanelservice.GetOrders();
+        return orderlist;
+    }
+
+    private async Task<List<CustomerOrder>> LoadOrderByDay()
+    {
+        orderlist = await adminpanelservice.GetOrderByDate(startDate);
+        return orderlist;
+    }
+
+
+
+    private async Task<List<CustomerOrder>> DetailClick(string orderdetails)
+    {
+        details = await adminpanelservice.GetOrderDetails(orderdetails);
+        ToggleDetailPopup();
+        return details;
+
+    }
+    private void ToggleDetailPopup()
+    {
+        DetailPopup = DetailPopup == true ? false : true;
+
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+      
+        await GetOrders();
+
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await notify.InvokeAsync();
+        }
+    }
+
+
+}

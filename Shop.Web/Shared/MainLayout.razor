@@ -1,0 +1,196 @@
+﻿@inherits LayoutComponentBase
+@using Shop.DataModels.CustomModels;
+@inject NavigationManager Navmanager;
+@using Shop.Web.Services;
+@inject ProtectedSessionStorage sessionstorage;
+@inject IUserPanelService userpanelservice;
+
+
+<style>
+    .mainlayout {
+        max-width: 900px;
+        margin: auto;
+        background: white;
+        padding: 10px;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    .header {
+        color: black;
+        padding: 5px;
+        border: 1px groove #808080;
+        border-radius: 14px;
+        background: linear-gradient(-45deg,#ffd800,#808080,#23a6d5,#7fb722);
+        background-size: 400% 400%;
+    }
+
+    .footer {
+        color: black;
+        padding: 5px;
+        border: 1px groove #808080;
+        border-radius: 7px;
+        background: linear-gradient(-45deg,#ffd800,#808080,#23a6d5,#ff00d3);
+        background-size: 400% 400%;
+    }
+
+    .col-container {
+        display: table;
+        width: 100%;
+        border-radius: 25px;
+    }
+
+    .col {
+        display: table-cell;
+        padding: 16px;
+    }
+
+    .divleft {
+        float: left;
+    }
+
+    .divright {
+        float: right;
+    }
+</style>
+
+<div class="mainlayout">
+    <div style="padding-bottom:25px;">
+        <div class="divleft" style="padding-right:15px;">
+            <NavLink href="/">    Home </NavLink>
+        </div>
+        <div class="divleft">
+            @if (IsUserLoggedIn)
+            {
+                <i class="fa fa-user"></i><span>Welcome,@LoggedInUserName</span>
+            }
+            else
+            {
+                <i class="fa fa-user"></i><span>Welcome</span>
+            }
+        </div>
+        <div class="divright">
+            @if (IsUserLoggedIn)
+            {
+                <div style="padding-left:15px;">
+                    <i class="fa fa-sign-out"></i><a @onclick="@LogOut" href="#"> LogOut </a>
+                </div>
+            }
+        </div>
+        <div class="divright" style="padding-left:15px;">
+            @if (IsUserLoggedIn)
+            {
+                <NavLink href="myaccount"> MyAccount </NavLink>
+            }
+        </div>
+        <div class="divright" style="padding-left:15px;">
+            @if (!IsUserLoggedIn)
+            {
+                <NavLink href="login"> Login </NavLink>
+            }
+        </div>
+        <div class="divright" style="padding-left:15px;">
+            @if (!IsUserLoggedIn)
+            {
+                <NavLink href="register"> Register </NavLink>
+            }
+        </div>
+    </div>
+    <div class="header">
+        <div class="col-container">
+            <div class="col" style="border-radius:20px">
+                <NavLink href="/">
+                    <img src="Images/iqra.jpg" style="cursor:pointer;" />
+                </NavLink>
+            </div>
+            <div class="col">
+                <a href="~/Images/dadada.jpg">
+                    <NavLink href="/mycart">
+                        <i class="fa fa-shopping-cart" style="font-size:40px;color:black">
+                            <span style="font-size:35px;vertical-align:top;padding:7px;color:black;border-radius:50%;padding-top:10px;font-weight:bold">
+                                <sup>@cartCount</sup>
+                            </span>
+                        </i>
+                    </NavLink>
+
+                </a>
+            </div>
+        </div>
+
+    </div>
+    <CascadingValue Value="event_notify">
+        @Body
+    </CascadingValue>
+
+    <div class="footer">
+        &copy; 2022 - Dragneel Mart
+    </div>
+</div>
+
+
+@code{
+    public int cartCount = 0;
+    public int layoutState = 0;
+    public bool IsUserLoggedIn = false;
+    public string LoggedInUserName = "User";
+    EventCallback event_notify => EventCallback.Factory.Create(this, NotifyLayout);
+    public List<CartModel> myCart { get; set; }
+
+    private async Task NotifyLayout()
+    {
+        IsUserLoggedIn = await userpanelservice.IsUserLoggedIn();
+        if (IsUserLoggedIn && layoutState==0)
+        {
+            var userNameSession = await sessionstorage.GetAsync<string>("userName");
+            LoggedInUserName = userNameSession.Value;
+            var checkOutSession = await sessionstorage.GetAsync<string>("checkoutAlert");
+            if (checkOutSession.Success)
+            {
+                await sessionstorage.DeleteAsync("checkoutAlert");
+                Navmanager.NavigateTo("/mycart");
+            }
+
+            StateHasChanged();
+            layoutState++;
+        }
+
+        if (layoutState == -1)
+        {
+            StateHasChanged();
+        }
+        var result = await sessionstorage.GetAsync<List<CartModel>>("myCart");
+        if(result.Success)
+        {
+            myCart = result.Value;
+            cartCount = myCart.Count;
+            await sessionstorage.DeleteAsync("updateCartFlag");
+            StateHasChanged();
+        }
+        else
+        {
+            cartCount = 0;
+        }
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await NotifyLayout();
+        }
+    }
+
+
+    private async void LogOut()
+    {
+        await sessionstorage.DeleteAsync("userKey");
+        await sessionstorage.DeleteAsync("userName");
+        await sessionstorage.DeleteAsync("userEmail");
+        await NotifyLayout();
+        Navmanager.NavigateTo("/");
+        layoutState = -1;
+    }
+}

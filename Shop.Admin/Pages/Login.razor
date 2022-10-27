@@ -1,0 +1,134 @@
+﻿@page "/login"
+@using Shop.DataModels.CustomModels;
+@inject NavigationManager Navmanager;
+@using Shop.Admin.Services;
+@inject IAdminPanelService AdminPanelService;
+@inject ProtectedSessionStorage sessionStorage;
+
+
+
+<h3>Login</h3>
+<style>
+    .loginBox {
+        font-family: 'Open Sans',sans-serif;
+        margin: 0 auto 0 auto;
+        width: 100%;
+        text-align: center;
+        margin: 20px 0px 20px 0px;
+    }
+
+    p {
+        font-size: 12px;
+        text-decoration: none;
+        color: #ffffff;
+    }
+
+    h1 {
+        font-size: 1.5em;
+        color: #525252;
+    }
+
+    .box {
+        background: white;
+        width: 300px;
+        border-radius: 6px;
+        margin: 0 auto 0 auto;
+        padding: 0px 0px 10px 0px;
+        border: #2877e9 4px solid;
+    }
+
+    .email {
+        background: #ffffff;
+        border: #ccc 1px solid;
+        border-bottom: #ccc 2px solid;
+        padding: 8px;
+        width: 250px;
+        color: #525252;
+        margin-top: 10px;
+        font-size: 1em;
+        border-radius: 4px;
+    }
+
+    .password {
+        border-radius: 4px;
+        background: #ecf0f1;
+        border: #ccc 1px solid;
+        padding: 8px;
+        width: 250px;
+        font-size: 1em;
+    }
+</style>
+
+<div style="min-height:400px;">
+    <div class="loginBox">
+        <div class="box">
+            <br />
+            <h1>Admin Panel</h1>
+            @if (loginModel != null)
+            {
+                <EditForm Model="@loginModel" OnValidSubmit="LoginClick">
+                    <DataAnnotationsValidator />
+                    <InputText type="email" name="email" class="email" placeholder="email" @bind-Value="loginModel.EmailId" autocomplete="off"></InputText>
+                    <ValidationMessage For="@(()=>loginModel.EmailId)"></ValidationMessage>
+                    <InputText type="password" name="password" class="password" placeholder="password" @bind-Value="loginModel.Password" autocomplete="off"></InputText>
+                    <ValidationMessage For="@(()=>loginModel.Password)"></ValidationMessage>
+                    <br /><br />
+                    <input type="submit" class=" btn btn-primary" value="Login" />
+                </EditForm>
+
+            }
+        </div>
+        <div>
+            <br />
+            <br />
+            <h4 class="bg-danger">@alertMessage</h4>
+        </div>
+        
+    </div>
+ 
+
+</div>
+
+
+@code {
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+    public LoginModel loginModel { get; set; }
+    public string alertMessage { get; set; }
+
+
+
+    protected override Task OnInitializedAsync()
+    {
+        loginModel = new LoginModel();
+
+        return base.OnInitializedAsync();
+    }
+
+
+    private async Task LoginClick()
+    {
+        var response = await AdminPanelService.AdminLogin(loginModel);
+        if (response.Status == true)
+        {
+            var user_response = response.Message.Split("|");
+            await sessionStorage.SetAsync("adminKey", user_response[0]);
+            await sessionStorage.SetAsync("adminName", user_response[1]);
+            await sessionStorage.SetAsync("adminEmail", user_response[2]);
+            await notify.InvokeAsync();
+            Navmanager.NavigateTo("/");
+           
+        }
+        else
+        {
+            alertMessage = response.Message;
+
+        }
+
+    }
+}
+
+
+
+
+
